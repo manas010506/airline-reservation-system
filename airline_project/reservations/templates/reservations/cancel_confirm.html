@@ -1,0 +1,52 @@
+{% extends 'reservations/base.html' %}
+{% block title %}
+  Cancel Booking — SkyBook
+{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card p-5 text-center">
+        <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size:3rem;"></i>
+        <h4 class="fw-bold">Cancel this booking?</h4>
+        <p class="text-muted mb-4">This action cannot be undone. Your payment will be refunded.</p>
+
+        <!-- Summary -->
+        <div class="card text-start p-3 mb-4 bg-light border-0">
+          <div class="small">
+            <div class="d-flex justify-content-between py-1">
+              <span class="text-muted">Booking ID</span>
+              <span class="fw-semibold">#{{ booking.id }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1">
+              <span class="text-muted">Route</span>
+              <span class="fw-semibold">
+                {{ booking.flight.source_airport.airport_code }} →
+                {{ booking.flight.dest_airport.airport_code }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between py-1">
+              <span class="text-muted">Departure</span>
+              <span class="fw-semibold">{{ booking.flight.departure_time|date:'d M Y, H:i' }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1">
+              <span class="text-muted">Seat</span>
+              <span class="fw-semibold">{{ booking.seat.seat_number }}</span>
+            </div>
+            <div class="d-flex justify-content-between py-1">
+              <span class="text-muted">Refund Amount</span>
+              <span class="fw-semibold text-success">₹{{ booking.payment.amount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirm Cancel Form -->
+        <form method="POST" class="d-flex gap-3 justify-content-center">
+          {% csrf_token %}
+          <a href="{% url 'my_bookings' %}" class="btn btn-outline-secondary px-4">Keep Booking</a>
+          <button type="submit" class="btn btn-danger px-4 fw-semibold">Yes, Cancel It</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

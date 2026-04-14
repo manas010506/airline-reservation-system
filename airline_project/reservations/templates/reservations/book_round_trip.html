@@ -1,0 +1,210 @@
+{% extends 'reservations/base.html' %}
+{% block title %}
+  Book Round-Trip — SkyBook
+{% endblock %}
+
+{% block content %}
+  <div class="row g-4">
+    <!-- Booking Form -->
+    <div class="col-md-7">
+      <div class="card p-4">
+        <h4 class="fw-bold mb-4">Unified Checkout: Select Seats & Pay</h4>
+
+        <form method="POST">
+          {% csrf_token %}
+
+          <!-- Number of Seats -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Number of Seats (Applies to both flights)</label>
+            <select name="num_seats" id="num_seats" class="form-select" required>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+
+          <!-- Outbound Seat Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold text-primary">Outbound Flight: Choose Seat(s)</label>
+            {% if outbound_seats %}
+              <div class="row g-2">
+                {% for seat in outbound_seats %}
+                  <div class="col-4 col-md-3">
+                    <input type="checkbox" class="btn-check outbound-seat-checkbox" name="outbound_seat_id" id="out_seat_{{ seat.id }}" value="{{ seat.id }}" data-fare="{{ seat.fare }}" />
+                    <label class="btn btn-outline-primary w-100 btn-sm" for="out_seat_{{ seat.id }}">
+                      {{ seat.seat_number }}
+                      <span class="d-block" style="font-size:10px;">{{ seat.get_seat_class_display }} - ₹{{ seat.fare }}</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-warning">No seats available for the outbound flight.</div>
+            {% endif %}
+          </div>
+
+          <!-- Return Seat Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold text-success">Return Flight: Choose Seat(s)</label>
+            {% if return_seats %}
+              <div class="row g-2">
+                {% for seat in return_seats %}
+                  <div class="col-4 col-md-3">
+                    <input type="checkbox" class="btn-check return-seat-checkbox" name="return_seat_id" id="ret_seat_{{ seat.id }}" value="{{ seat.id }}" data-fare="{{ seat.fare }}" />
+                    <label class="btn btn-outline-success w-100 btn-sm" for="ret_seat_{{ seat.id }}">
+                      {{ seat.seat_number }}
+                      <span class="d-block" style="font-size:10px;">{{ seat.get_seat_class_display }} - ₹{{ seat.fare }}</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-warning">No seats available for the return flight.</div>
+            {% endif %}
+          </div>
+
+          <!-- Payment Method -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <select name="payment_method" class="form-select" required>
+              {% for value, label in payment_methods %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if outbound_seats and return_seats %}
+            <button type="submit" id="submit_btn" class="btn btn-primary w-100 py-3 fw-bold fs-5" disabled><i class="bi bi-lock me-1"></i>Confirm Bookings & Pay — ₹<span id="btn_total">0.00</span></button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- Combined Flight Summary -->
+    <div class="col-md-5">
+      <!-- Outbound -->
+      <div class="card p-4 mb-3 border-primary" style="border-width: 2px;">
+        <h5 class="fw-bold mb-3 text-primary">Outbound Flight</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="text-center">
+            <div class="fs-4 fw-bold">{{ outbound_flight.source_airport.airport_code }}</div>
+            <div class="text-muted small">{{ outbound_flight.source_airport.city }}</div>
+          </div>
+          <i class="bi bi-arrow-right fs-4 text-primary"></i>
+          <div class="text-center">
+            <div class="fs-4 fw-bold">{{ outbound_flight.dest_airport.airport_code }}</div>
+            <div class="text-muted small">{{ outbound_flight.dest_airport.city }}</div>
+          </div>
+        </div>
+        <div class="small">
+          <div class="d-flex justify-content-between py-1"><span class="text-muted">Departure</span><span class="fw-semibold">{{ outbound_flight.departure_time|date:'d M, H:i' }}</span></div>
+          <div class="d-flex justify-content-between py-1"><span class="text-muted">Sub-Total Fare</span><span class="fw-semibold" id="outbound_total">₹0.00</span></div>
+        </div>
+      </div>
+
+      <!-- Return -->
+      <div class="card p-4 mb-3 border-success" style="border-width: 2px;">
+        <h5 class="fw-bold mb-3 text-success">Return Flight</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="text-center">
+            <div class="fs-4 fw-bold">{{ return_flight.source_airport.airport_code }}</div>
+            <div class="text-muted small">{{ return_flight.source_airport.city }}</div>
+          </div>
+          <i class="bi bi-arrow-right fs-4 text-success"></i>
+          <div class="text-center">
+            <div class="fs-4 fw-bold">{{ return_flight.dest_airport.airport_code }}</div>
+            <div class="text-muted small">{{ return_flight.dest_airport.city }}</div>
+          </div>
+        </div>
+        <div class="small">
+          <div class="d-flex justify-content-between py-1"><span class="text-muted">Departure</span><span class="fw-semibold">{{ return_flight.departure_time|date:'d M, H:i' }}</span></div>
+          <div class="d-flex justify-content-between py-1"><span class="text-muted">Sub-Total Fare</span><span class="fw-semibold" id="return_total">₹0.00</span></div>
+        </div>
+      </div>
+
+      <!-- Grand Total -->
+      <div class="card p-4 bg-light">
+        <div class="d-flex justify-content-between py-1">
+          <span class="fw-bold fs-5">Grand Total</span>
+          <span class="fs-4 fw-bold text-dark" id="grand_total">₹0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const numSeatsSelect = document.getElementById('num_seats');
+      const outCheckboxes = document.querySelectorAll('.outbound-seat-checkbox');
+      const retCheckboxes = document.querySelectorAll('.return-seat-checkbox');
+      
+      const submitBtn = document.getElementById('submit_btn');
+      const btnTotal = document.getElementById('btn_total');
+      const outboundTotalDisplay = document.getElementById('outbound_total');
+      const returnTotalDisplay = document.getElementById('return_total');
+      const grandTotalDisplay = document.getElementById('grand_total');
+
+      function calculateTotal(checkboxes) {
+        let total = 0.0;
+        let count = 0;
+        checkboxes.forEach(cb => {
+          if (cb.checked) {
+              total += parseFloat(cb.getAttribute('data-fare') || 0);
+              count++;
+          }
+        });
+        return { total, count };
+      }
+
+      function enforceLimit(checkboxes, allowedSeats, currentCount) {
+        checkboxes.forEach(cb => {
+          if (!cb.checked && currentCount >= allowedSeats) cb.disabled = true;
+          else cb.disabled = false;
+        });
+      }
+
+      function updateSelection() {
+        if (!numSeatsSelect) return;
+        const allowedSeats = parseInt(numSeatsSelect.value);
+        
+        let outStats = calculateTotal(outCheckboxes);
+        let retStats = calculateTotal(retCheckboxes);
+
+        enforceLimit(outCheckboxes, allowedSeats, outStats.count);
+        enforceLimit(retCheckboxes, allowedSeats, retStats.count);
+        
+        const combinedTotal = (outStats.total + retStats.total).toFixed(2);
+        
+        if (outboundTotalDisplay) outboundTotalDisplay.textContent = "₹" + outStats.total.toFixed(2);
+        if (returnTotalDisplay) returnTotalDisplay.textContent = "₹" + retStats.total.toFixed(2);
+        if (grandTotalDisplay) grandTotalDisplay.textContent = "₹" + combinedTotal;
+        if (btnTotal) btnTotal.textContent = combinedTotal;
+        
+        if (submitBtn) {
+          if (outStats.count < allowedSeats || retStats.count < allowedSeats) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Please select ' + allowedSeats + ' seat(s) for BOTH flights';
+          } else {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-lock me-1"></i>Confirm Bookings & Pay — ₹' + combinedTotal;
+          }
+        }
+      }
+
+      if (numSeatsSelect) {
+        numSeatsSelect.addEventListener('change', function() {
+          outCheckboxes.forEach(cb => cb.checked = false);
+          retCheckboxes.forEach(cb => cb.checked = false);
+          updateSelection();
+        });
+      }
+
+      outCheckboxes.forEach(cb => cb.addEventListener('change', updateSelection));
+      retCheckboxes.forEach(cb => cb.addEventListener('change', updateSelection));
+
+      updateSelection();
+    });
+  </script>
+{% endblock %}

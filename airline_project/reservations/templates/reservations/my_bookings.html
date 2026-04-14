@@ -1,0 +1,100 @@
+{% extends "reservations/base.html" %}
+{% block title %}My Bookings — SkyBook{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold mb-0">My Bookings</h3>
+  <a href="{% url 'search_flights' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus me-1"></i>New Booking
+  </a>
+</div>
+
+{% if bookings %}
+  {% for booking in bookings %}
+  <div class="card mb-3 p-4">
+    <div class="row align-items-center">
+
+      <!-- Route -->
+      <div class="col-md-4">
+        <div class="d-flex align-items-center gap-2">
+          <div>
+            <div class="fs-4 fw-bold">
+              {{ booking.flight.source_airport.airport_code }}
+            </div>
+            <div class="small text-muted">
+              {{ booking.flight.source_airport.city }}
+            </div>
+          </div>
+          <i class="bi bi-arrow-right text-primary mx-2"></i>
+          <div>
+            <div class="fs-4 fw-bold">
+              {{ booking.flight.dest_airport.airport_code }}
+            </div>
+            <div class="small text-muted">
+              {{ booking.flight.dest_airport.city }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="col-md-4 small text-muted mt-3 mt-md-0">
+        <div><i class="bi bi-hash me-1"></i>Booking #{{ booking.id }}</div>
+        <div><i class="bi bi-airplane me-1"></i>{{ booking.flight.flight_number }}</div>
+        <div>
+          <i class="bi bi-calendar me-1"></i>
+          {{ booking.flight.departure_time|date:"d M Y, H:i" }}
+        </div>
+        <div><i class="bi bi-geo me-1"></i>Seat {{ booking.seat.seat_number }}
+          ({{ booking.seat.get_seat_class_display }})
+        </div>
+      </div>
+
+      <!-- Status & Action -->
+      <div class="col-md-4 text-md-end mt-3 mt-md-0">
+
+        {% if booking.status == 'CONFIRMED' %}
+          <span class="badge badge-confirmed px-3 py-2 mb-2 d-inline-block">
+            Confirmed
+          </span>
+        {% elif booking.status == 'CANCELLED' %}
+          <span class="badge badge-cancelled px-3 py-2 mb-2 d-inline-block">
+            Cancelled
+          </span>
+        {% else %}
+          <span class="badge badge-pending px-3 py-2 mb-2 d-inline-block">
+            Pending
+          </span>
+        {% endif %}
+
+        <div class="small text-muted mb-2">
+          ₹{{ booking.payment.amount }}
+          · {{ booking.payment.get_method_display }}
+        </div>
+
+        {% if booking.status == 'CONFIRMED' %}
+          <a href="{% url 'cancel_booking' booking.id %}"
+             class="btn btn-outline-danger btn-sm">
+            Cancel
+          </a>
+        {% endif %}
+
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+
+{% else %}
+  <div class="card p-5 text-center">
+    <i class="bi bi-ticket-perforated fs-1 text-muted mb-3"></i>
+    <h5 class="fw-semibold">No bookings yet</h5>
+    <p class="text-muted">Search for a flight and book your first ticket!</p>
+    <a href="{% url 'search_flights' %}" class="btn btn-primary px-5 mx-auto"
+       style="width:fit-content;">
+      Search Flights
+    </a>
+  </div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends 'reservations/base.html' %}
+{% block title %}
+  Book Flight — SkyBook
+{% endblock %}
+
+{% block content %}
+  <div class="row g-4">
+    <!-- Booking Form -->
+    <div class="col-md-7">
+      <div class="card p-4">
+        <h4 class="fw-bold mb-4">Select Seat & Payment</h4>
+
+        <form method="POST">
+          {% csrf_token %}
+
+          <!-- Number of Seats -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Number of Seats</label>
+            <select name="num_seats" id="num_seats" class="form-select" required>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+
+          <!-- Seat Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Choose Seat(s)</label>
+            {% if available_seats %}
+              <div class="row g-2">
+                {% for seat in available_seats %}
+                  <div class="col-4 col-md-3">
+                    <input type="checkbox" class="btn-check seat-checkbox" name="seat_id" id="seat_{{ seat.id }}" value="{{ seat.id }}" data-fare="{{ seat.fare }}" />
+                    <label class="btn btn-outline-primary w-100 btn-sm" for="seat_{{ seat.id }}">
+                      {{ seat.seat_number }}
+                      <span class="d-block" style="font-size:10px;">{{ seat.get_seat_class_display }} - ₹{{ seat.fare }}</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-warning">No seats available for this flight.</div>
+            {% endif %}
+          </div>
+
+          <!-- Payment Method -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <select name="payment_method" class="form-select" required>
+              {% for value, label in payment_methods %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if available_seats %}
+            <button type="submit" id="submit_btn" class="btn btn-primary w-100 py-2 fw-semibold" disabled><i class="bi bi-lock me-1"></i>Confirm Booking — ₹<span id="btn_total">0.00</span></button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- Flight Summary -->
+    <div class="col-md-5">
+      <div class="card p-4">
+        <h5 class="fw-bold mb-3">Flight Summary</h5>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="text-center">
+            <div class="fs-3 fw-bold">{{ flight.source_airport.airport_code }}</div>
+            <div class="text-muted small">{{ flight.source_airport.city }}</div>
+          </div>
+          <i class="bi bi-arrow-right fs-4 text-primary"></i>
+          <div class="text-center">
+            <div class="fs-3 fw-bold">{{ flight.dest_airport.airport_code }}</div>
+            <div class="text-muted small">{{ flight.dest_airport.city }}</div>
+          </div>
+        </div>
+
+        <hr />
+
+        <div class="small">
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Flight</span>
+            <span class="fw-semibold">{{ flight.flight_number }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Departure</span>
+            <span class="fw-semibold">{{ flight.departure_time|date:'d M Y, H:i' }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Arrival</span>
+            <span class="fw-semibold">{{ flight.arrival_time|date:'d M Y, H:i' }}</span>
+          </div>
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Aircraft</span>
+            <span class="fw-semibold">{{ flight.aircraft.model }}</span>
+          </div>
+          <hr />
+          <div class="d-flex justify-content-between py-1">
+            <span class="fw-semibold">Total Fare</span>
+            <span class="fs-5 fw-bold text-primary" id="flight_fare_total">₹0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const numSeatsSelect = document.getElementById('num_seats');
+      const checkboxes = document.querySelectorAll('.seat-checkbox');
+      const submitBtn = document.getElementById('submit_btn');
+      const flightFareTotal = document.getElementById('flight_fare_total');
+      const baseFare = parseFloat('{{ flight.base_fare }}');
+
+      function updateSelection() {
+        if (!numSeatsSelect) return;
+        const allowedSeats = parseInt(numSeatsSelect.value);
+        let checkedCount = 0;
+        let currentTotal = 0.0;
+        checkboxes.forEach(cb => {
+          if (cb.checked) {
+              checkedCount++;
+              currentTotal += parseFloat(cb.getAttribute('data-fare') || 0);
+          }
+        });
+
+        checkboxes.forEach(cb => {
+          if (!cb.checked && checkedCount >= allowedSeats) {
+            cb.disabled = true;
+          } else {
+            cb.disabled = false;
+          }
+        });
+        
+        const total = currentTotal.toFixed(2);
+        if (flightFareTotal) flightFareTotal.textContent = "₹" + total;
+        
+        if (submitBtn) {
+          if (checkedCount < allowedSeats) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i>Please select ' + (allowedSeats - checkedCount) + ' more seat(s)';
+          } else {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-lock me-1"></i>Confirm Booking — ₹' + total;
+          }
+        }
+      }
+
+      if (numSeatsSelect) {
+        numSeatsSelect.addEventListener('change', function() {
+          checkboxes.forEach(cb => cb.checked = false);
+          updateSelection();
+        });
+      }
+
+      checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelection);
+      });
+
+      updateSelection();
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends 'reservations/base.html' %}
+{% block title %}
+Search Flights — SkyBook
+{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-4">Search Flights</h3>
+
+<!-- Search Form -->
+<div class="card p-4 mb-4">
+  <form method="POST">
+    {% csrf_token %}
+    <div class="mb-3 d-flex gap-4">
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="trip_type" id="oneWay" value="ONE_WAY" {% if trip_type != 'RETURN' %}checked{% endif %} onchange="toggleReturnDate()">
+        <label class="form-check-label fw-semibold" for="oneWay">One Way</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="trip_type" id="roundTrip" value="RETURN" {% if trip_type == 'RETURN' %}checked{% endif %} onchange="toggleReturnDate()">
+        <label class="form-check-label fw-semibold" for="roundTrip">Round Trip</label>
+      </div>
+    </div>
+    <div class="row g-3 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">From</label>
+        <select name="source" class="form-select" required>
+          <option value="">Select airport</option>
+          {% for airport in airports %}
+          <option value="{{ airport.airport_code }}">{{ airport.airport_code }} — {{ airport.city }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">To</label>
+        <select name="destination" class="form-select" required>
+          <option value="">Select airport</option>
+          {% for airport in airports %}
+          <option value="{{ airport.airport_code }}">{{ airport.airport_code }} — {{ airport.city }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Departure Date</label>
+        <input type="date" name="date" class="form-control" required />
+      </div>
+
+      <div class="col-md-3 {% if trip_type != 'RETURN' %}d-none{% endif %}" id="returnDateCol">
+        <label class="form-label fw-semibold">Return Date</label>
+        <input type="date" name="return_date" id="return_date" class="form-control" {% if trip_type == 'RETURN' %}required{% endif %} />
+      </div>
+
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold"><i class="bi bi-search me-1"></i>Search</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Results -->
+{% if flights is not None %}
+{% if trip_type == 'ONE_WAY' %}
+{% if flights %}
+<h5 class="fw-semibold mb-3">{{ flights|length }} Outbound flight(s) found</h5>
+{% for flight in flights %}
+<div class="card mb-3 p-4">
+  <div class="row align-items-center">
+    <!-- Route & Time -->
+    <div class="col-md-5">
+      <div class="d-flex align-items-center gap-3">
+        <div class="text-center">
+          <div class="fs-4 fw-bold">{{ flight.source_airport.airport_code }}</div>
+          <div class="small text-muted">{{ flight.source_airport.city }}</div>
+          <div class="small fw-semibold">{{ flight.departure_time|date:'H:i' }}</div>
+        </div>
+        <div class="text-center text-muted flex-grow-1">
+          <i class="bi bi-arrow-right fs-5 text-primary"></i>
+          <div class="small">{{ flight.flight_number }}</div>
+        </div>
+        <div class="text-center">
+          <div class="fs-4 fw-bold">{{ flight.dest_airport.airport_code }}</div>
+          <div class="small text-muted">{{ flight.dest_airport.city }}</div>
+          <div class="small fw-semibold">{{ flight.arrival_time|date:'H:i' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aircraft & Date -->
+    <div class="col-md-4 text-muted small mt-3 mt-md-0">
+      <div><i class="bi bi-airplane me-1"></i>{{ flight.aircraft.model }}</div>
+      <div><i class="bi bi-calendar me-1"></i>{{ flight.departure_time|date:'d M Y' }}</div>
+      <div><i class="bi bi-building me-1"></i>{{ flight.aircraft.airline_name }}</div>
+    </div>
+
+    <!-- Fare & Book -->
+    <div class="col-md-3 text-md-end mt-3 mt-md-0">
+      <div class="fs-4 fw-bold text-primary">₹{{ flight.base_fare }}</div>
+      <div class="text-muted small mb-2">per person</div>
+      <a href="{% url 'book_flight' flight.id %}" class="btn btn-primary btn-sm px-4 fw-semibold">Book Now</a>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% elif trip_type == 'RETURN' %}
+{% if flights and return_flights %}
+<form onsubmit="event.preventDefault(); submitRoundTrip();">
+  <div class="row">
+    <div class="col-md-6">
+      <h5 class="fw-semibold mb-3 text-primary">{{ flights|length }} Outbound flight(s)</h5>
+      {% for flight in flights %}
+      <label class="card mb-3 p-3 flight-card-label border border-2">
+        <div class="d-flex align-items-center">
+          <div class="me-3">
+            <input class="form-check-input fs-5" type="radio" name="outbound_flight" value="{{ flight.id }}" required style="cursor: pointer;">
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-bold fs-5">{{ flight.source_airport.airport_code }} <i class="bi bi-arrow-right text-muted mx-1"></i> {{ flight.dest_airport.airport_code }}</span>
+              <span class="fw-bold fs-5 text-primary">₹{{ flight.base_fare }}</span>
+            </div>
+            <div class="small text-muted mb-2"><i class="bi bi-building me-1"></i>{{ flight.aircraft.airline_name }} &bull; {{ flight.flight_number }}</div>
+            <div class="d-flex justify-content-between small fw-semibold bg-light p-2 rounded">
+              <span><i class="bi bi-clock me-1 text-muted"></i>Dep: {{ flight.departure_time|date:'H:i' }}</span>
+              <span><i class="bi bi-clock-history me-1 text-muted"></i>Arr: {{ flight.arrival_time|date:'H:i' }}</span>
+            </div>
+          </div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="col-md-6">
+      <h5 class="fw-semibold mb-3 text-success">{{ return_flights|length }} Return flight(s)</h5>
+      {% for flight in return_flights %}
+      <label class="card mb-3 p-3 flight-card-label return-card border border-2">
+        <div class="d-flex align-items-center">
+          <div class="me-3">
+            <input class="form-check-input fs-5 form-check-input-success" type="radio" name="return_flight" value="{{ flight.id }}" required style="cursor: pointer;">
+          </div>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-bold fs-5">{{ flight.source_airport.airport_code }} <i class="bi bi-arrow-left text-muted mx-1"></i> {{ flight.dest_airport.airport_code }}</span>
+              <span class="fw-bold fs-5 text-success">₹{{ flight.base_fare }}</span>
+            </div>
+            <div class="small text-muted mb-2"><i class="bi bi-building me-1"></i>{{ flight.aircraft.airline_name }} &bull; {{ flight.flight_number }}</div>
+            <div class="d-flex justify-content-between small fw-semibold bg-light p-2 rounded">
+              <span><i class="bi bi-clock me-1 text-muted"></i>Dep: {{ flight.departure_time|date:'H:i' }}</span>
+              <span><i class="bi bi-clock-history me-1 text-muted"></i>Arr: {{ flight.arrival_time|date:'H:i' }}</span>
+            </div>
+          </div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="sticky-bottom bg-white p-3 border-top mt-4 text-end shadow-sm rounded">
+    <button type="submit" class="btn btn-primary px-5 py-2 fw-bold">Proceed to Checkout <i class="bi bi-arrow-right"></i></button>
+  </div>
+</form>
+{% endif %}
+{% endif %}
+{% endif %}
+
+<script>
+  function toggleReturnDate() {
+    const isRoundTrip = document.getElementById('roundTrip').checked;
+    const returnCol = document.getElementById('returnDateCol');
+    const returnInput = document.getElementById('return_date');
+    if (isRoundTrip) {
+      returnCol.classList.remove('d-none');
+      returnInput.required = true;
+    } else {
+      returnCol.classList.add('d-none');
+      returnInput.required = false;
+      returnInput.value = '';
+    }
+  }
+
+  function submitRoundTrip() {
+    const outbound = document.querySelector('input[name="outbound_flight"]:checked');
+    const returnFlight = document.querySelector('input[name="return_flight"]:checked');
+    if (outbound && returnFlight) {
+      window.location.href = `/book-round-trip/${outbound.value}/${returnFlight.value}/`;
+    } else {
+      alert("Please select both an outbound and a return flight.");
+    }
+  }
+</script>
+<style>
+  .flight-card-label {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-color: #dee2e6 !important;
+  }
+  .flight-card-label:hover {
+    border-color: #adb5bd !important;
+    background-color: #f8f9fa;
+  }
+  .flight-card-label:has(input:checked) {
+    border-color: #0d6efd !important;
+    background-color: #f0f8ff !important;
+    box-shadow: 0 .125rem .25rem rgba(13,110,253,.15);
+  }
+  .flight-card-label.return-card:has(input:checked) {
+    border-color: #198754 !important;
+    background-color: #f0fff4 !important;
+    box-shadow: 0 .125rem .25rem rgba(25,135,84,.15);
+  }
+  .form-check-input-success:checked {
+    background-color: #198754;
+    border-color: #198754;
+  }
+</style>
+{% endblock %}
